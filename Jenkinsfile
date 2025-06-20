@@ -2,10 +2,13 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'DEPLOY_HOST', defaultValue: '', description: 'FTP host (e.g., ftp.example.com)')
-        string(name: 'DEPLOY_DIR', defaultValue: '', description: 'Remote FTP directory (e.g., public_html/wp-site)')
-        string(name: 'FTP_USER', defaultValue: '', description: 'FTP Username')
-        password(name: 'FTP_PASS', defaultValue: '', description: 'FTP Password')
+        string(name: 'DEPLOY_HOST', defaultValue: '3.110.11.141', description: 'FTP host')
+        string(name: 'DEPLOY_DIR', defaultValue: 'project', description: 'Remote FTP directory')
+    }
+
+    environment {
+        DEPLOY_HOST = "${params.DEPLOY_HOST}"
+        DEPLOY_DIR  = "${params.DEPLOY_DIR}"
     }
 
     stages {
@@ -26,33 +29,34 @@ pipeline {
 
         stage('Deploy to cPanel via FTP') {
             steps {
-                echo "📤 Uploading WordPress files to ${params.DEPLOY_HOST}..."
-
-                sh """
-                lftp -e "
-                    set ftp:ssl-allow no;
-                    set ftp:passive-mode true;
-                    mirror --reverse --delete --verbose \
-                        --exclude-glob .git* \
-                        --exclude-glob node_modules/ \
-                        --exclude-glob .env \
-                        --exclude-glob README.md \
-                        --exclude-glob package*.json \
-                        --exclude-glob .github/ \
-                        ./ ${params.DEPLOY_DIR};
-                    bye
-                " -u "${params.FTP_USER}","${params.FTP_PASS}" "${params.DEPLOY_HOST}"
-                """
+                echo "📤 Uploading WordPress files to ${env.DEPLOY_HOST}..."
+                withCredentials([usernamePassword(credentialsId: 'ftp-deploy-creds', usernameVariable: 'FTP_USER', passwordVariable: 'FTP_PASS')]) {
+                    sh '''
+                    lftp -e "
+                        set ftp:ssl-allow no;
+                        set ftp:passive-mode true;
+                        mirror --reverse --delete --verbose \
+                            --exclude-glob .git* \
+                            --exclude-glob node_modules/ \
+                            --exclude-glob .env \
+                            --exclude-glob README.md \
+                            --exclude-glob package*.json \
+                            --exclude-glob .github/ \
+                            ./ ${DEPLOY_DIR};
+                        bye
+                    " -u "$FTP_USER","$FTP_PASS" "$DEPLOY_HOST"
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo "✅ WordPress deployment to ${params.DEPLOY_HOST} completed!"
+            echo "✅ WordPress deployment to ${env.DEPLOY_HOST} completed!"
         }
         failure {
-            echo "❌ Deployment to ${params.DEPLOY_HOST} failed!"
+            echo "❌ Deployment to ${env.DEPLOY_HOST} failed!"
         }
         always {
             cleanWs()
