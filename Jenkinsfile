@@ -30,7 +30,7 @@ pipeline {
                 '''
             }
         }
-
+        // lftp is used for FTP transfers
         stage('Deploy to cPanel via FTP') {
             steps {
                 echo "📤 Uploading WordPress files to $DEPLOY_HOST..."
