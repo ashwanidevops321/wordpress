@@ -8,13 +8,6 @@ pipeline {
         password(name: 'FTP_PASS', defaultValue: '', description: 'FTP Password')
     }
 
-    environment {
-        DEPLOY_HOST = "${params.DEPLOY_HOST}"
-        DEPLOY_DIR  = "${params.DEPLOY_DIR}"
-        FTP_USER    = "${params.FTP_USER}"
-        FTP_PASS    = "${params.FTP_PASS}"
-    }
-
     stages {
         stage('Checkout WordPress Code') {
             steps {
@@ -30,10 +23,10 @@ pipeline {
                 '''
             }
         }
-        // lftp is used for FTP transfers
+
         stage('Deploy to cPanel via FTP') {
             steps {
-                echo "📤 Uploading WordPress files to $DEPLOY_HOST..."
+                echo "📤 Uploading WordPress files to ${params.DEPLOY_HOST}..."
 
                 sh """
                 lftp -e "
@@ -46,9 +39,9 @@ pipeline {
                         --exclude-glob README.md \
                         --exclude-glob package*.json \
                         --exclude-glob .github/ \
-                        ./ $DEPLOY_DIR;
+                        ./ ${params.DEPLOY_DIR};
                     bye
-                " -u "$FTP_USER","$FTP_PASS" "$DEPLOY_HOST"
+                " -u "${params.FTP_USER}","${params.FTP_PASS}" "${params.DEPLOY_HOST}"
                 """
             }
         }
@@ -56,10 +49,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ WordPress deployment to $DEPLOY_HOST completed!"
+            echo "✅ WordPress deployment to ${params.DEPLOY_HOST} completed!"
         }
         failure {
-            echo "❌ Deployment failed! Please check the console output."
+            echo "❌ Deployment to ${params.DEPLOY_HOST} failed!"
         }
         always {
             cleanWs()
