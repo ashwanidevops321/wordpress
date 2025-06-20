@@ -5,7 +5,7 @@ pipeline {
         DEPLOY_HOST = '3.110.11.141'
         DEPLOY_DIR  = 'project'
         FTP_USER    = 'jenkins'
-        FTP_PASS    = 'Ashwani@123' // ❌ Not safe in production
+        FTP_PASS    = 'Ashwani@123'  // ⚠️ For testing only. Avoid hardcoding in production.
     }
 
     stages {
@@ -28,20 +28,23 @@ pipeline {
             steps {
                 echo "📤 Uploading WordPress files to ${env.DEPLOY_HOST}..."
                 sh """
-                    lftp -e \"
-                        set ftp:ssl-allow no;
-                        set ftp:passive-mode true;
-                        mirror --reverse --delete --verbose \\
-                            --exclude-glob .git* \\
-                            --exclude-glob node_modules/ \\
-                            --exclude-glob .env \\
-                            --exclude-glob README.md \\
-                            --exclude-glob package*.json \\
-                            --exclude-glob .github/ \\
-                            ./ ${DEPLOY_DIR};
-                        bye
-                    \" -u '${FTP_USER}','${FTP_PASS}' '${DEPLOY_HOST}'
-                """
+                    cat <<EOF > /tmp/ftp_script.lftp
+set ftp:ssl-allow no
+set ftp:passive-mode true
+open -u ${FTP_USER},${FTP_PASS} ${DEPLOY_HOST}
+mirror --reverse --delete --verbose \\
+    --exclude-glob .git* \\
+    --exclude-glob node_modules/ \\
+    --exclude-glob .env \\
+    --exclude-glob README.md \\
+    --exclude-glob package*.json \\
+    --exclude-glob .github/ \\
+    ./ ${DEPLOY_DIR}
+bye
+EOF
+
+lftp -f /tmp/ftp_script.lftp
+"""
             }
         }
     }
