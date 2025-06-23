@@ -23,7 +23,7 @@ pipeline {
             }
         }
 
-stage('Deploy via LFTP over SFTP') {
+        stage('Deploy via LFTP over SFTP') {
             steps {
                 echo '📤 Uploading index.php and assets/ via lftp (SFTP)...'
 
@@ -64,6 +64,7 @@ EOF
                 }
             }
         }
+    }
 
     post {
         success {
