@@ -64,7 +64,7 @@ EOF
                 }
             }
         }
-    }
+    } // END of stages
 
     post {
         success {
@@ -77,4 +77,4 @@ EOF
             cleanWs()
         }
     }
-}
+} // END of pipeline
