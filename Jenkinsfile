@@ -4,7 +4,7 @@ pipeline {
     environment {
         DEPLOY_HOST_ID = 'deploy_host'
         DEPLOY_DIR_ID  = 'deploy_directory'
-        SFTP_CRED_ID   = 'sftp_user_pass'
+        SFTP_CRED_ID   = 'ftp_creds'
     }
 
     stages {
@@ -23,9 +23,9 @@ pipeline {
             }
         }
 
-        stage('Deploy via SFTP (Password Auth)') {
+        stage('Deploy via SFTP') {
             steps {
-                echo '📤 Uploading only index.php and assets/ via SFTP (password)...'
+                echo '📤 Uploading only index.php and assets/ via SFTP (password auth)...'
 
                 withCredentials([
                     string(credentialsId: "${DEPLOY_HOST_ID}", variable: 'DEPLOY_HOST'),
@@ -33,28 +33,27 @@ pipeline {
                     usernamePassword(credentialsId: "${SFTP_CRED_ID}", usernameVariable: 'SFTP_USER', passwordVariable: 'SFTP_PASS')
                 ]) {
                     sh '''
-                        echo "Uploading to $DEPLOY_HOST:$DEPLOY_DIR using SFTP..."
-
-                        # Ensure sshpass is available
                         if ! command -v sshpass &> /dev/null; then
                             echo "❌ sshpass not installed. Please install it on the agent."
                             exit 1
                         fi
 
                         mkdir -p /tmp/sftp_batch
+                        BATCH_FILE=/tmp/sftp_batch/upload.sftp
 
-                        # Create batch SFTP commands
-                        echo "mkdir -p $DEPLOY_DIR/assets" > /tmp/sftp_batch/upload.sftp
-                        echo "put index.php $DEPLOY_DIR/index.php" >> /tmp/sftp_batch/upload.sftp
+                        # Prepare batch file
+                        echo "mkdir -p $DEPLOY_DIR/assets" > $BATCH_FILE
+                        echo "put index.php $DEPLOY_DIR/index.php" >> $BATCH_FILE
 
                         find assets -type f | while read file; do
-                            remote_path="$DEPLOY_DIR/$file"
-                            remote_dir=$(dirname "$remote_path")
-                            echo "mkdir -p $remote_dir" >> /tmp/sftp_batch/upload.sftp
-                            echo "put $file $remote_path" >> /tmp/sftp_batch/upload.sftp
+                            remote="$DEPLOY_DIR/$file"
+                            echo "mkdir -p \$(dirname \"$remote\")" >> $BATCH_FILE
+                            echo "put $file $remote" >> $BATCH_FILE
                         done
 
-                        sshpass -p "$SFTP_PASS" sftp -o StrictHostKeyChecking=no -b /tmp/sftp_batch/upload.sftp $SFTP_USER@$DEPLOY_HOST
+                        sshpass -p "$SFTP_PASS" \
+                          sftp -o StrictHostKeyChecking=no -b $BATCH_FILE \
+                          "$SFTP_USER@$DEPLOY_HOST"
                     '''
                 }
             }
@@ -62,14 +61,8 @@ pipeline {
     }
 
     post {
-        success {
-            echo "✅ index.php and assets/ uploaded successfully via SFTP!"
-        }
-        failure {
-            echo "❌ SFTP deployment failed!"
-        }
-        always {
-            cleanWs()
-        }
+        success { echo "✅ index.php and assets/ uploaded successfully via SFTP!" }
+        failure { echo "❌ SFTP deployment failed!" }
+        always { cleanWs() }
     }
 }
