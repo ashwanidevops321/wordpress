@@ -23,7 +23,7 @@ pipeline {
             }
         }
 
-        stage('Deploy via LFTP over SFTP') {
+stage('Deploy via LFTP over SFTP') {
             steps {
                 echo '📤 Uploading index.php and assets/ via lftp (SFTP)...'
 
@@ -33,11 +33,13 @@ pipeline {
                     usernamePassword(credentialsId: "${SFTP_CRED_ID}", usernameVariable: 'SFTP_USER', passwordVariable: 'SFTP_PASS')
                 ]) {
                     sh '''
-                        # Ensure lftp is installed
+                        # Check if lftp is installed
                         if ! command -v lftp &> /dev/null; then
                             echo "❌ lftp is not installed on this agent."
                             exit 1
                         fi
+
+                        echo "✅ lftp is available. Proceeding with deployment..."
 
                         lftp -u "$SFTP_USER","$SFTP_PASS" sftp://$DEPLOY_HOST <<EOF
 set ssl:verify-certificate no
@@ -47,7 +49,7 @@ set net:timeout 20
 
 mirror --reverse --delete --verbose \\
        --include index.php \\
-       --include assets/ \\
+       --include-glob assets/* \\
        --exclude-glob .git* \\
        --exclude-glob .env \\
        --exclude-glob node_modules/ \\
@@ -62,7 +64,6 @@ EOF
                 }
             }
         }
-    }
 
     post {
         success {
