@@ -23,9 +23,9 @@ pipeline {
             }
         }
 
-        stage('Deploy via SFTP') {
+        stage('Deploy via LFTP over SFTP') {
             steps {
-                echo '📤 Uploading only index.php and assets/ via SFTP (password auth)...'
+                echo '📤 Uploading index.php and assets/ via lftp (SFTP)...'
 
                 withCredentials([
                     string(credentialsId: "${DEPLOY_HOST_ID}", variable: 'DEPLOY_HOST'),
@@ -33,27 +33,31 @@ pipeline {
                     usernamePassword(credentialsId: "${SFTP_CRED_ID}", usernameVariable: 'SFTP_USER', passwordVariable: 'SFTP_PASS')
                 ]) {
                     sh '''
-                        if ! command -v sshpass &> /dev/null; then
-                            echo "❌ sshpass not installed. Please install it on the agent."
+                        # Ensure lftp is installed
+                        if ! command -v lftp &> /dev/null; then
+                            echo "❌ lftp is not installed on this agent."
                             exit 1
                         fi
 
-                        mkdir -p /tmp/sftp_batch
-                        BATCH_FILE=/tmp/sftp_batch/upload.sftp
+                        lftp -u "$SFTP_USER","$SFTP_PASS" sftp://$DEPLOY_HOST <<EOF
+set ssl:verify-certificate no
+set sftp:auto-confirm yes
+set net:max-retries 2
+set net:timeout 20
 
-                        # Prepare batch file
-                        echo "mkdir -p $DEPLOY_DIR/assets" > $BATCH_FILE
-                        echo "put index.php $DEPLOY_DIR/index.php" >> $BATCH_FILE
+mirror --reverse --delete --verbose \\
+       --include index.php \\
+       --include assets/ \\
+       --exclude-glob .git* \\
+       --exclude-glob .env \\
+       --exclude-glob node_modules/ \\
+       --exclude-glob README.md \\
+       --exclude-glob package*.json \\
+       --exclude-glob .github/ \\
+       ./ $DEPLOY_DIR
 
-                        find assets -type f | while read file; do
-                            remote="$DEPLOY_DIR/$file"
-                            echo "mkdir -p \$(dirname \"$remote\")" >> $BATCH_FILE
-                            echo "put $file $remote" >> $BATCH_FILE
-                        done
-
-                        sshpass -p "$SFTP_PASS" \
-                          sftp -o StrictHostKeyChecking=no -b $BATCH_FILE \
-                          "$SFTP_USER@$DEPLOY_HOST"
+bye
+EOF
                     '''
                 }
             }
@@ -61,8 +65,14 @@ pipeline {
     }
 
     post {
-        success { echo "✅ index.php and assets/ uploaded successfully via SFTP!" }
-        failure { echo "❌ SFTP deployment failed!" }
-        always { cleanWs() }
+        success {
+            echo "✅ index.php and assets/ uploaded successfully via lftp (SFTP)!"
+        }
+        failure {
+            echo "❌ lftp SFTP deployment failed!"
+        }
+        always {
+            cleanWs()
+        }
     }
 }
