@@ -2,11 +2,10 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_HOST = '3.110.11.141'
-        DEPLOY_DIR  = 'project'
-        FTP_USER    = 'jenkins'
-        FTP_PASS    = 'Ashwani@123'  // ⚠️ For testing only. Avoid hardcoding in production.
-    }
+    DEPLOY_HOST_ID = 'deploy_host'
+    DEPLOY_DIR_ID  = 'deploy_directory'
+    FTP_CRED_ID    = 'ftp_creds'
+}
 
     stages {
         stage('Checkout WordPress Code') {
